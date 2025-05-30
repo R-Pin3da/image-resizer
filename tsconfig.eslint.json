@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "lib": ["es2021"],
+    "module": "commonjs",
+    "target": "es2021",
+    "experimentalDecorators": true,
+    "strict": true,
+    "useUnknownInCatchVariables": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": true,
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "baseUrl": ".",
+    /* "paths": {
+      "@/*": ["./src/*"],
+      "~/*": ["./*"]
+    } */
+  },
+  "include": ["**/*.ts", "**/*.js"],
+  "exclude": ["dist", "node_modules"]
+}
