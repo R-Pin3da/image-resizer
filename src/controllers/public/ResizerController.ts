@@ -1,24 +1,17 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import AbstractController from '../AbstractController'
-import ImageResizeService from '../../services/ImageResizeService'
+import { UrlImageResizer } from '../../services/UrlImageResizer'
 
 interface ResizeQuery {
   w: number
-  h?: number
   url: string
 }
 
 export default class ResizerController extends AbstractController {
-  private imageResizeService: ImageResizeService
-
-  public constructor (fastify: FastifyInstance) {
-    super(fastify)
-    this.imageResizeService = new ImageResizeService()
-  }
-
   public async resizeImage (request: FastifyRequest<{ Querystring: ResizeQuery }>, reply: FastifyReply) {
-    const { w, h, url } = request.query
-    const { buffer, format } = await this.imageResizeService.resizeFromUrl(url, w, h)
+    const { w, url } = request.query
+    const imageResizer = new UrlImageResizer(url)
+    const { buffer, format } = await imageResizer.resize(w)
     reply.header('Content-Type', `image/${format}`)
       .send(buffer)
   }
@@ -34,7 +27,6 @@ export default class ResizerController extends AbstractController {
           required: ['w', 'url'],
           properties: {
             w: { type: 'integer', minimum: 1, maximum: 2048 },
-            h: { type: 'integer', minimum: 1, maximum: 2048 },
             url: { type: 'string', format: 'uri' }
           }
         }
