@@ -23,6 +23,30 @@ interface FetchImageBufferResponse {
   buffer: ArrayBuffer
 }
 
+async function fileExists (path: string): Promise<boolean> {
+  try {
+    const stats = await fs.promises.stat(path)
+    return stats.isFile()
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return false
+    }
+    throw err
+  }
+}
+
+async function dirExists (path: string): Promise<boolean> {
+  try {
+    const stats = await fs.promises.stat(path)
+    return stats.isDirectory()
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return false
+    }
+    throw err
+  }
+}
+
 export class UrlImageResizer extends AbstractService {
   private static CACHE_DIR = path.join(process.cwd(), 'images')
   private static ADJUST_QUALITY_ABOVE = 800
@@ -76,7 +100,7 @@ export class UrlImageResizer extends AbstractService {
       image = image.toFormat(meta.format, { quality: UrlImageResizer.OUTPUT_QUALITY })
     }
     const newImageBuffer = await image.toBuffer()
-    fs.writeFileSync(path.join(this.imageDiskDir, `${width}${this.extensionString}`), newImageBuffer)
+    fs.promises.writeFile(path.join(this.imageDiskDir, `${width}${this.extensionString}`), newImageBuffer)
 
     const format = meta.format === 'heif' ? 'avif' : meta.format
 
@@ -102,21 +126,23 @@ export class UrlImageResizer extends AbstractService {
   private async fetchImageBuffer (width: number): Promise<FetchImageBufferResponse> {
     const imageFileName = `${width}${this.extensionString}`
     const targetImage = path.join(this.imageDiskDir, imageFileName)
-    if (fs.existsSync(targetImage)) {
-      const buffer = fs.readFileSync(targetImage)
+    if (await fileExists(targetImage)) {
+      const buffer = await fs.promises.readFile(targetImage, { flag: 'r' })
       return { buffer, type: ImageSourceType.EXACT }
     }
 
-    if (fs.existsSync(this.imageDiskDir)) {
-      const biggerImage = fs.readdirSync(this.imageDiskDir).find((f) => {
-        const diskWidth = +f.split('.')[0]
-        if (isNaN(diskWidth)) {
-          return false
-        }
-        return diskWidth > width
-      })
-      if (biggerImage) {
-        const buffer = fs.readFileSync(path.join(this.imageDiskDir, biggerImage))
+    if (await dirExists(this.imageDiskDir)) {
+      const files = await fs.promises.readdir(this.imageDiskDir)
+      const candidates = files
+        .map(f => {
+          return parseInt(f.split('.')[0], 10)
+        })
+        .filter(f => !isNaN(f) && f > width)
+
+      if (candidates.length) {
+        candidates.sort((a, b) => a - b)
+        const best = candidates[0]
+        const buffer = await fs.promises.readFile(path.join(this.imageDiskDir, `${best}${this.extensionString}`))
         return { buffer, type: ImageSourceType.BIGGER }
       }
     }
@@ -124,8 +150,8 @@ export class UrlImageResizer extends AbstractService {
     const originalFilename = `original${this.extensionString}`
     const originalImageFullPath = path.join(this.imageDiskDir, originalFilename)
 
-    if (fs.existsSync(originalImageFullPath)) {
-      const buffer = fs.readFileSync(originalImageFullPath)
+    if (await fileExists(originalImageFullPath)) {
+      const buffer = await fs.promises.readFile(originalImageFullPath)
       return { buffer, type: ImageSourceType.ORIGINAL }
     }
 
@@ -135,8 +161,8 @@ export class UrlImageResizer extends AbstractService {
     }
     const buffer = await res.arrayBuffer()
 
-    fs.mkdirSync(this.imageDiskDir, { recursive: true })
-    fs.writeFileSync(originalImageFullPath, Buffer.from(buffer))
+    await fs.promises.mkdir(this.imageDiskDir, { recursive: true })
+    fs.promises.writeFile(originalImageFullPath, Buffer.from(buffer))
 
     return { buffer, type: ImageSourceType.ORIGINAL }
   }
