@@ -1,16 +1,17 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import AbstractController from '../AbstractController'
-import { UrlImageResizer } from '../../services/UrlImageResizer'
+import { ConversionFormat, UrlImageResizer } from '../../services/UrlImageResizer'
 
 interface ResizeQuery {
   w: number
-  url: string
+  url: string,
+  f?: ConversionFormat
 }
 
 export default class ResizerController extends AbstractController {
   public async resizeImage (request: FastifyRequest<{ Querystring: ResizeQuery }>, reply: FastifyReply) {
-    const { w, url } = request.query
-    const imageResizer = new UrlImageResizer(url)
+    const { w, url, f } = request.query
+    const imageResizer = new UrlImageResizer(url, f)
     const { buffer, format } = await imageResizer.resize(w)
     reply.header('Content-Type', `image/${format}`)
       .send(buffer)
@@ -27,6 +28,7 @@ export default class ResizerController extends AbstractController {
           required: ['w', 'url'],
           properties: {
             w: { type: 'integer', minimum: 1, maximum: 2048 },
+            f: { type: 'string', enum: ['jpg', 'png', 'webp', 'avif'] },
             url: { type: 'string', format: 'uri' }
           }
         }
